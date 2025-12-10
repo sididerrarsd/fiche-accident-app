@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+
+<!-- PWA -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<title>Fiche d’intervention accident réseau</title>
+
+<style>
+:root { font-family: system-ui, Arial, sans-serif; }
+body { margin:0; background:#0b1020; color:#e8ecf1; }
+
+/* HEADER */
+header{
+  position:sticky;top:0;background:#111735;padding:12px 14px;
+  border-bottom:1px solid #222a52;z-index:10;
+}
+header h1{margin:0 0 6px 0;font-size:18px;}
+header .actions{display:flex;gap:8px;flex-wrap:wrap;}
+button{
+  background:#2b67f6;color:white;border:0;padding:10px 12px;
+  border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;
+}
+button.secondary{background:#27304f;}
+
+main{padding:12px;display:grid;gap:12px;}
+section{background:#121a3a;border:1px solid #202b5a;border-radius:14px;padding:12px;}
+section h2{margin:0 0 10px 0;font-size:16px;}
+
+label{font-size:13px;color:#c9d2e3;display:block;margin:8px 0 4px;}
+
+input,select,textarea{
+  width:100%;padding:10px;border-radius:10px;
+  background:#0e1533;border:1px solid #2a3563;color:#e8ecf1;
+  font-size:16px;
+}
+
+textarea{min-height:70px;}
+
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+.error{color:#ffb3b3;font-size:12px;margin-top:4px;display:none;}
+.tiny{font-size:12px;color:#aab4c7;}
+
+.filled{background:#0f331f!important;border-color:#22c55e!important;}
+
+.photo-list{display:grid;gap:6px;}
+.photo-item{
+  background:#0e1533;border:1px dashed #2a3563;
+  padding:8px;border-radius:10px;display:flex;
+  justify-content:space-between;align-items:center;font-size:13px;
+}
+.pill{padding:2px 8px;background:#1e2750;border-radius:999px;font-size:12px;}
+
+footer{text-align:center;padding:12px;color:#8da0c0;font-size:12px;}
+
+/* MOBILE */
+@media(max-width:640px){
+  header h1{font-size:16px;}
+  header .actions{flex-direction:column;}
+  button{width:100%;}
+  .row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🚌 Fiche d’intervention accident réseau</h1>
+  <div class="actions">
+    <button onclick="saveLocal()">💾 Sauvegarder</button>
+    <button class="secondary" onclick="loadLocal()">↩️ Recharger</button>
+    <button class="secondary" onclick="newReport()">🆕 Nouveau</button>
+    <button onclick="exportJSON()">⬇️ Export JSON</button>
+    <button onclick="openPrintable()">📄 PDF / Impression</button>
+  </div>
+  <div id="status" class="tiny"></div>
+</header>
+
+<main>
+
+<!-- A -->
+<section>
+<h2>A — Infos générales</h2>
+
+<label>Date / heure</label>
+<input id="datetime" type="datetime-local">
+
+<label>Adresse précise</label>
+<input id="accidentAddress">
+<div id="err-accidentAddress" class="error">Champ obligatoire.</div>
+
+<label>Météo</label>
+<select id="weather">
+  <option value="">— choisir —</option>
+  <option>Clair / sec</option><option>Pluie</option>
+  <option>Brouillard</option><option>Neige</option>
+  <option>Nuit / faible visibilité</option><option>Autre</option>
+</select>
+</section>
+
+<!-- B -->
+<section>
+<h2>B — Description</h2>
+
+<label>Cause apparente</label>
+<select id="cause">
+  <option value="">— choisir —</option>
+  <option>Collision véhicule tiers</option>
+  <option>Obstacle</option><option>Piéton/cycliste</option>
+  <option>Chute interne</option><option>Malaise conducteur</option>
+  <option>Autre</option>
+</select>
+
+<label>Détails</label>
+<textarea id="causeDetails"></textarea>
+
+<label>Position / sens du bus</label>
+<input id="busPosition" />
+
+<label>Tiers impliqués ?</label>
+<select id="thirdParty"><option>Non</option><option>Oui</option></select>
+
+<label>Police nationale ?</label>
+<select id="police"><option value="">—</option><option>Oui</option><option>Non</option></select>
+
+<label>SP intervenus ?</label>
+<select id="spIntervention"><option value="">—</option><option>Oui</option><option>Non</option></select>
+
+<div class="row">
+<div>
+  <label>Conducteur pris en charge ?</label>
+  <select id="spDriverCare"><option value="">—</option><option>Oui</option><option>Non</option></select>
+</div>
+<div>
+  <label>Mis en cause pris en charge ?</label>
+  <select id="spInvolvedCare"><option value="">—</option><option>Oui</option><option>Non</option></select>
+</div>
+</div>
+
+<label>Passagers pris en charge ?</label>
+<select id="spPassengersCare"><option value="">—</option><option>Oui</option><option>Non</option></select>
+</section>
+
+<!-- B2 -->
+<section>
+<h2>B2 — Mis en cause</h2>
+
+<label>Type</label>
+<select id="mainInvolvedType">
+<option value="">— choisir —</option>
+<option>Conducteur VL</option><option>Piéton</option>
+<option>Cycliste</option><option>Autre</option>
+</select>
+
+<label>Nom / Prénom</label>
+<input id="mainInvolvedName" />
+
+<div class="row">
+  <div><label>Naissance</label><input id="mainInvolvedDob" type="date" /></div>
+  <div><label>Téléphone</label><input id="mainInvolvedPhone" inputmode="tel" /></div>
+</div>
+
+<label>Adresse</label><input id="mainInvolvedAddress" />
+
+<label>Infos VL</label>
+<textarea id="mainInvolvedVehicle"></textarea>
+
+<label>Autres mis en cause</label>
+<textarea id="otherInvolved"></textarea>
+
+<h3 class="tiny" style="margin-top:10px;">Photos documents</h3>
+
+<label>Carte grise</label>
+<input type="file" accept="image/*" capture="environment" multiple onchange="handlePhotos(event,'carte grise')" />
+
+<label>Permis</label>
+<input type="file" accept="image/*" capture="environment" multiple onchange="handlePhotos(event,'permis')" />
+
+<label>Assurance</label>
+<input type="file" accept="image/*" capture="environment" multiple onchange="handlePhotos(event,'assurance')" />
+</section>
+
+<!-- C -->
+<section>
+<h2>C — Bus / Conducteur</h2>
+
+<div class="row">
+  <div><label>N° service</label><input id="serviceNumber"></div>
+  <div><label>N° bus</label><input id="busNumber"></div>
+</div>
+
+<label>Conducteur</label>
+<input id="driverName" />
+
+<div class="row">
+  <div><label>Blessé ?</label><select id="driverInjured"><option>Non</option><option>Oui</option></select></div>
+  <div><label>Apte ?</label><select id="driverFit"><option>Oui</option><option>Non</option></select></div>
+</div>
+
+<label>Observations</label>
+<textarea id="driverNotes"></textarea>
+
+<label>Dépistage</label>
+<select id="driverTest"><option value="NA">N/A</option><option>Oui</option><option>Non</option></select>
+</section>
+
+<!-- D -->
+<section>
+<h2>D — Passagers / Usagers</h2>
+
+<div class="row">
+  <div><label>Nb passagers</label><input id="passengerCount" type="number" min="0" /></div>
+  <div><label>Nb blessés</label><input id="passengerInjuredCount" type="number" min="0" /></div>
+</div>
+
+<label>Nom blessé</label><input id="injuredName" />
+
+<div class="row">
+  <div><label>Naissance</label><input id="injuredDob" type="date" /></div>
+  <div><label>Téléphone</label><input id="injuredPhone" inputmode="tel" /></div>
+</div>
+
+<label>Adresse</label><input id="injuredAddress" />
+
+<label>Détails blessures</label>
+<textarea id="passengerInjuredDetails"></textarea>
+
+<label>Témoins</label>
+<textarea id="witnesses"></textarea>
+</section>
+
+<!-- E -->
+<section>
+<h2>E — Photos accident</h2>
+
+<label>Ajouter des photos</label>
+<input type="file" accept="image/*" capture="environment" multiple onchange="handlePhotos(event,'accident')" />
+
+<div id="photoList" class="photo-list"></div>
+</section>
+
+<section>
+<h2>Validation</h2>
+<div class="tiny" id="validationSummary"></div>
+<button onclick="validateAll()">Vérifier</button>
+</section>
+
+</main>
+
+<footer>Fiche intervention — installable + hors-ligne</footer>
+
+
+<!-- JS -->
+<script>
+const $=id=>document.getElementById(id);
+let photos=[];
+
+/* Réduction photo */
+function resizeImageFile(file,max=1600,quality=0.7){
+ return new Promise(res=>{
+  let fr=new FileReader();
+  fr.onload=()=>{let img=new Image();
+   img.onload=()=>{
+    let r=Math.min(max/img.width,max/img.height,1);
+    let w=img.width*r,h=img.height*r;
+    let c=document.createElement("canvas");
+    c.width=w;c.height=h;
+    c.getContext("2d").drawImage(img,0,0,w,h);
+    let data=c.toDataURL("image/jpeg",quality);
+    let size=Math.round((data.length-"data:image/jpeg;base64,".length)*3/4);
+    res({dataUrl:data,size,type:"image/jpeg"});
+   };
+   img.src=fr.result;
+  };
+  fr.readAsDataURL(file);
+ });
+}
+
+/* Ajout photos */
+async function handlePhotos(e,cat){
+ let files=[...e.target.files];
+ for(const f of files){
+  let r=await resizeImageFile(f);
+  photos.push({name:f.name,size:r.size,type:r.type,dataUrl:r.dataUrl,category:cat});
+ }
+ renderPhotos(); saveLocal(true); e.target.value="";
+}
+
+/* Affichage photos */
+function renderPhotos(){
+ $("photoList").innerHTML=photos.map((p,i)=>`
+ <div class="photo-item">
+   <div>📷 ${p.name} <span class="pill">${p.category}</span> <span class="pill">${(p.size/1024).toFixed(0)} KB</span></div>
+   <button class="secondary" onclick="removePhoto(${i})">Suppr</button>
+ </div>`).join("");
+}
+function removePhoto(i){photos.splice(i,1);renderPhotos();saveLocal(true);}
+
+/* Champs remplis */
+function applyFilledStateToField(f){
+ if(f.value.trim()!=="") f.classList.add("filled");
+ else f.classList.remove("filled");
+}
+function setupFilledWatcher(){
+ document.querySelectorAll("input,textarea,select").forEach(f=>{
+  f.oninput=()=>applyFilledStateToField(f);
+  f.onchange=()=>applyFilledStateToField(f);
+  applyFilledStateToField(f);
+ });
+}
+
+/* Form data */
+function getFormData(){
+ return {
+  datetime:$("datetime").value,
+  accidentAddress:$("accidentAddress").value,
+  weather:$("weather").value,
+  cause:$("cause").value,
+  causeDetails:$("causeDetails").value,
+  busPosition:$("busPosition").value,
+  thirdParty:$("thirdParty").value,
+  police:$("police").value,
+  sp:{
+   intervention:$("spIntervention").value,
+   driverCare:$("spDriverCare").value,
+   involvedCare:$("spInvolvedCare").value,
+   passengersCare:$("spPassengersCare").value
+  },
+  involved:{
+   mainType:$("mainInvolvedType").value,
+   mainName:$("mainInvolvedName").value,
+   mainDob:$("mainInvolvedDob").value,
+   mainPhone:$("mainInvolvedPhone").value,
+   mainAddress:$("mainInvolvedAddress").value,
+   mainVehicle:$("mainInvolvedVehicle").value,
+   others:$("otherInvolved").value
+  },
+  busService:{
+   serviceNumber:$("serviceNumber").value,
+   busNumber:$("busNumber").value
+  },
+  driver:{
+   name:$("driverName").value,
+   injured:$("driverInjured").value,
+   fit:$("driverFit").value,
+   notes:$("driverNotes").value,
+   test:$("driverTest").value
+  },
+  passengers:{
+   count:$("passengerCount").value,
+   injuredCount:$("passengerInjuredCount").value,
+   injuredDetails:$("passengerInjuredDetails").value,
+   witnesses:$("witnesses").value
+  },
+  injuredIdentity:{
+   name:$("injuredName").value,
+   dob:$("injuredDob").value,
+   phone:$("injuredPhone").value,
+   address:$("injuredAddress").value
+  },
+  photos
+ };
+}
+
+/* Remplissage */
+function fillFormData(d){
+ Object.entries({
+  datetime:"datetime",accidentAddress:"accidentAddress",
+  weather:"weather",cause:"cause",causeDetails:"causeDetails",
+  busPosition:"busPosition",thirdParty:"thirdParty",police:"police"
+ }).forEach(([key,id])=>{$(id).value=d[key]||""});
+
+ $("spIntervention").value=d.sp?.intervention||"";
+ $("spDriverCare").value=d.sp?.driverCare||"";
+ $("spInvolvedCare").value=d.sp?.involvedCare||"";
+ $("spPassengersCare").value=d.sp?.passengersCare||"";
+
+ $("mainInvolvedType").value=d.involved?.mainType||"";
+ $("mainInvolvedName").value=d.involved?.mainName||"";
+ $("mainInvolvedDob").value=d.involved?.mainDob||"";
+ $("mainInvolvedPhone").value=d.involved?.mainPhone||"";
+ $("mainInvolvedAddress").value=d.involved?.mainAddress||"";
+ $("mainInvolvedVehicle").value=d.involved?.mainVehicle||"";
+ $("otherInvolved").value=d.involved?.others||"";
+
+ $("serviceNumber").value=d.busService?.serviceNumber||"";
+ $("busNumber").value=d.busService?.busNumber||"";
+
+ $("driverName").value=d.driver?.name||"";
+ $("driverInjured").value=d.driver?.injured||"";
+ $("driverFit").value=d.driver?.fit||"";
+ $("driverNotes").value=d.driver?.notes||"";
+ $("driverTest").value=d.driver?.test||"";
+
+ $("passengerCount").value=d.passengers?.count||"0";
+ $("passengerInjuredCount").value=d.passengers?.injuredCount||"0";
+ $("passengerInjuredDetails").value=d.passengers?.injuredDetails||"";
+ $("witnesses").value=d.passengers?.witnesses||"";
+
+ $("injuredName").value=d.injuredIdentity?.name||"";
+ $("injuredDob").value=d.injuredIdentity?.dob||"";
+ $("injuredPhone").value=d.injuredIdentity?.phone||"";
+ $("injuredAddress").value=d.injuredIdentity?.address||"";
+
+ photos=d.photos||[];
+ renderPhotos();
+ setupFilledWatcher();
+}
+
+/* Validation */
+function validateAll(){
+ let d=getFormData();
+ let ok=true;
+
+ if(!d.accidentAddress){
+  $("err-accidentAddress").style.display="block";
+  ok=false;
+ }
+ const accPhotos=d.photos.filter(p=>p.category==="accident").length;
+ $("validationSummary").innerHTML=`
+   <div>${d.accidentAddress?"✅":"❌"} Adresse</div>
+   <div>${d.cause?"✅":"⚠️"} Cause</div>
+   <div>${accPhotos>0?"✅":"⚠️"} Photos accident</div>`;
+ return ok;
+}
+
+/* Sauvegarde */
+function saveLocal(s=false){
+ localStorage.setItem("accidentBusReport",JSON.stringify(getFormData()));
+ if(!s) $("status").textContent="Sauvegardé.";
+}
+function loadLocal(s=false){
+ let d=localStorage.getItem("accidentBusReport");
+ if(d){ fillFormData(JSON.parse(d)); if(!s) $("status").textContent="Rechargé."; }
+}
+function newReport(){
+ if(!confirm("Nouvelle fiche ?"))return;
+ localStorage.removeItem("accidentBusReport");
+ location.reload();
+}
+
+/* Export JSON */
+function exportJSON(){
+ let blob=new Blob([JSON.stringify(getFormData(),null,2)],{type:"application/json"});
+ let a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);
+ a.download="fiche-accident.json";
+ a.click();
+}
+
+/* PDF / Impression */
+function openPrintable(){
+ window.print();
+}
+
+/* INIT */
+function init(){
+ let n=new Date();
+ $("datetime").value=new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ loadLocal(true);
+ setupFilledWatcher();
+}
+
+/* Enregistrement Service Worker */
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register("service-worker.js");
+}
+
+init();
+</script>
+
+</body>
+</html>
